@@ -1,0 +1,219 @@
+---
+title: "Adverse Weather Implication in the USA 1950 - 2011"
+author: "Abiyu Giday"
+date: "September 25, 2015"
+output:
+  html_document:
+    toc: yes
+  pdf_document:
+    toc: yes
+---
+
+#Abstract:
+<img src="http://www.clipartbest.com/cliparts/LcK/da6/LcKda6RKi.png" align="right" width="25%" height="25%" />
+Every year sever weather events such as storm, flood and tornado adversely impact the United States (US) economy and put the general public's health at greater risk. Analysis contained in this document explores the impact of adverse weather events in the US from 1950 thru 2011.  The storm database was obtained from [National Oceanic & Atmospheric Administration (NOAA)](https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2). The database tracks characteristics of major weather events including when/where they occur, financial impact estimation and injury/fatality counts. The database contains 985 different types of weather condition and 902 thousand distinct observations. Therefor understanding and preparing for weather events, to the extent possible, is very important both for the economy and to minimize impact on public health.
+
+The result discussed in this paper attempts to answer the following two questions:-
+
+* Across the United States, which types of weather related events are most harmful with respect to population health?
+* Across the United States, which types of weather related events have the greatest economic consequences?
+
+The findings and observation on this paper are intneded to help government and municipal managers who are responsible for planning and prioritizing resources in the events of adverse weather conditions. 
+
+#Data Processing:
+
+To process the data R static programming language was used in Rstudio Integrated Development Environment(IDE).  The R packages that were used to process this data were: **_“dplyr”, “ggplot”, “tidyr”, "knitr" and “lubridate”_**.  [The raw data for this analysis was obtained from NOAA and can be dowloaded frrom here](https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2). 
+
+**The following R script downloads dataset from NOAA and saves it in a _data_ direcotry.**
+
+```{r, echo=TRUE}
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(lubridate)
+library(knitr)
+setwd("~/Documents/Data-Science/DataScienceSpecialization/ReproducibleResearch/proj2/Reproduceable")
+
+if(!file.exists("./data")){dir.create("./data")}
+fileUrl <- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2"
+download.file(fileUrl, destfile = "./data/StormData.csv.bz2", method = "curl")
+
+strmd <- tbl_df(read.csv(bzfile("./data/StormData.csv.bz2")))
+str(strmd)
+```
+
+##Data tydying section:
+***The following code clean the data and set it in a format ready for the analysis***
+```{r tydydata, echo=TRUE}
+sd1 <- select(strmd, BGN_DATE, STATE, EVTYPE, COUNTY, COUNTYNAME, F, FATALITIES, INJURIES,   PROPDMG, CROPDMG, LATITUDE,   LONGITUDE )
+sd1$BGN_DATE <- as.Date(sd1$BGN_DATE, format = "%m/%d/%Y %H:%M:%S")
+sd1 <- separate(sd1, BGN_DATE, c("year", "month", "day"), sep = "-")
+
+sd1
+```
+
+***Explanation on data filter in the codes*** it is important to point out the reason behind setting the filters for this analysis, and why high and low water mark cut off numbers were selected for both health and economic dataset. The raw data from NOAA contains overwhelmingly more Tornado observations than any other weather event from 1950 thru 1990. Tornado's alone account for 80% of the total adverse weather counts in the NOAA dataset, which distorts the finding without the filters. 
+
+
+#Result section:
+
+##Health impact:   
+In terms of health impact on the population, the analysis shows that, **_Tornado_**, accounts for 80.2%  of the total injuries and fatalities for years spanning from 1950 to 2011.  Tornado comes 4th, in frequency of occurrence, after "Hail”, “TSTM wind” and “Thunder storm”, but it was the cause of 55,464 injuries and fatalities.  The second weather event that impacted US population's health  the most was  ***_Excessive heat_***  causing harm to 4,265 individuals (6.2%), and the 3rd most cause of injury and fatality was ***_Flood_*** harming 2, 562 people (3.7%).
+
+**Here are the codes used to create a data frame for the health impact analysis.**  
+
+```{r, theMostHealth}
+# This code adds a column that combines the Injuries and Fatality for each weather event type.
+df1 <- sd1  %>% filter(INJURIES > 100 & FATALITIES > 10 )  %>% 
+                 group_by(year, EVTYPE)  %>% 
+                       summarise_each(funs(sum), INJURIES, FATALITIES)  %>% 
+                                mutate( TotalHealthImpact = INJURIES + FATALITIES) %>% 
+                                   arrange(TotalHealthImpact)
+df1
+```
+
+###Here is the graph for Most Health impact in the US
+This graph shows the combined weather evetns that caused at list 100 injuries and 10 fatalities. 
+```{r, theMostHealthGraph}
+plot(df1$year, df1$TotalHealthImpact, type = "l", lwd = 4, col = "red", main = "Weather event impact on Health.", xlab = "Years", ylab = "Injuries & Fatalities Count.")
+abline(h = 1000, lwd = 2, lty =2)
+```
+
+***Here is the ranking of weather event type per total number of injuries and fatalities.*** 
+_Note: the ranking numbers are based on the filter window set in the script_
+
+```{r, HealthRanking}
+df11 <- df1 %>% 
+             group_by(EVTYPE)  %>%
+                summarise_each(funs(sum), TotalHealthImpact)  %>% 
+                       arrange(desc(TotalHealthImpact))                                
+                                            
+df11
+```
+
+##Economic impact:    
+The weather event with the most adverse economic consequences was _Tornado_, costing US economy $3.3 billion dollars.  The second weather condition that had dire economic impact was _Flash_ Flood” at a cost of $1.6 billion dollars. _TSM WIND_ was the 4th most costly weather event at $1.4 billion dollars.
+
+**Here are the code used to to create a data frame for the economic impact analysis.**
+
+```{r EconomicTheMost}
+#This code adds a column that combines the property and crop damage costs. 
+df18 <- sd1  %>% filter(PROPDMG > 100 | CROPDMG > 100)  %>% 
+                 group_by(year, EVTYPE)  %>% 
+                       summarise_each(funs(sum), PROPDMG, CROPDMG)  %>% 
+                                mutate( TotalEconthImpact = PROPDMG + CROPDMG) %>% 
+                                                             arrange(TotalEconthImpact)
+#df18
+```
+
+###Here is the graph for Most Economic impact in the US.
+The filter for this graph is set from a minimum of $100 thousand dollars worth of property or crop damage. 
+```{r, theMostEconthGraph}
+plot(df18$year, df18$TotalEconthImpact, type = "l", lwd = 4, col = "blue", main = "Weather event impact on Economy.", xlab = "Years", ylab = "Property & Crop Damage in millions.")
+abline(h = 55000, lwd = 2, lty =2)
+```
+
+###Here is another graph that shows weather events with Most Economic impact from 1995 to 2011
+The following graphs shows the impact on the economy for property damages more than $500k & crop damage more than $250k. Because more diverse weather events were collected in the 1990's, the graph reflects more variability from the 1990's to 2011.
+```{r,fig.width=8, fig.height=6 }
+# The following filter is setup to examine Economic impact from 1995 
+df19 <- sd1  %>% filter(PROPDMG > 500 & CROPDMG > 250)  %>% 
+                 group_by(year, EVTYPE)  %>% 
+                       summarise_each(funs(sum), PROPDMG, CROPDMG)  %>% 
+                                mutate( TotalEconthImpact = PROPDMG + CROPDMG) %>% 
+                                                             arrange(TotalEconthImpact)
+#df19
+
+
+k <- ggplot(df19, aes(year, fill=EVTYPE)) # bar...
+k + geom_bar() + ggtitle("Weather event for $500k property damage & $250k crop damage.")
+```
+
+***Here is the ranking of economic impact per weather event for the combined property and crop damages.***
+_Note: the ranking numbers are based on the filter window set during the data frame creation._ 
+
+```{r, EconRanking}
+#Filter weather evetns that cost the economy more than 0 for both perpoerty and crop damage.
+df1 <- sd1  %>% filter(PROPDMG > 0 | CROPDMG > 0)  %>% 
+                 group_by(year, EVTYPE)  %>% 
+                       summarise_each(funs(sum), PROPDMG, CROPDMG)  %>% 
+                                mutate( TotalEconthImpact = PROPDMG + CROPDMG)
+                                                             
+# rank weather event with total financial impact.
+df11 <- df1 %>% 
+             group_by(EVTYPE)  %>%
+                summarise_each(funs(sum), TotalEconthImpact)  %>% 
+                       arrange(desc(TotalEconthImpact))                                
+                                            
+df11
+```
+
+
+
+#Other Weather event Factoids from the NOAA dataset:
+
+### The maximum number of Fatalties, Injuries, Property damage and crop damage 
+
+```{r, MaxImpact, echo = TRUE}
+max(sd1$FATALITIES)
+max(sd1$INJURIES)
+max(sd1$CROPDMG)
+max(sd1$PROPDMG)
+sd1  %>% filter( FATALITIES == "583" | INJURIES == "1700"| CROPDMG == "990" | PROPDMG == "5000")
+```
+
+###Most and list frequent weather events.
+```{r}
+df11 <- sd1 %>% group_by(EVTYPE)  %>%  summarise(count = n()) %>% arrange(desc(count))
+
+head(df11)
+tail(df11)
+```
+
+###The years with most and list active weather events listed.
+```{r}
+df12 <- sd1 %>% group_by(year)  %>%  summarise(count = n()) %>% arrange(desc(count))
+head(df12)
+tail(df12)
+```
+###States that experienced the most and list weather events
+```{r}
+df13 <- sd1 %>% group_by(STATE)  %>%  summarise(count = n()) %>% arrange(desc(count))
+head(df13)
+tail(df13)
+```
+###Months with the most and list Weather events
+```{r}
+df14 <- sd1 %>% group_by(month)  %>%  summarise(count = n()) %>% arrange(desc(count))
+head(df14)
+tail(df14)
+```
+
+### Total Fatality, Injury count & Total Property and Crop cost incured.
+```{r, totalImpact, echo = TRUE}
+ sum(sd1$FATALITIES) 
+ sum(sd1$INJURIES)
+ sum(sd1$CROPDMG) * 1000
+ sum(sd1$PROPDMG) * 1000
+```
+
+# Overall observation & recomendation:
+
+The US sever weather data analysis for the span of 61 years shows that 97.6% of the the weather events didn't cause health problems or had meaningfully measurable economic impact. However, the data analysis on this paper shows, 2.4% of the sever weather events had tremendous cost to public health, and had a significant negative consequences to the US economy.  
+
+**Here is a list that puts the total counts and costs in numbers:** 
+<ul>
+<li> 15,145 fatalities were incurred. </li>
+<li> 140, 528 injuries were caused.</li>
+<li> $1.4 billion was the price tag for crop damages.</li>
+<li> $10.9 billions in property damages. </li>
+</ul>
+
+The weather event that caused the maximum number of injuries took place on the  April 10, 1979 **_Tornado_** in Wichita county Texas. There were 1700 reported injures. **_Heat_** caused the most fatality at 583. This weather event happened on July 12, 1995 in Illinois. In terms of economic impact, there were four weather events that caused the most property damage at the price tag of 5 million each. Two of the four were caused by **_Flash Flood_** in Illinois, Mercer and Henry county on May 13, 2010.  North Carolina's Franklin county was the third county with property damage of 5 million dollars caused by **_Thunderstorm_** on July 26, 2009. A **_Waterspout_** event on marine zone 555, located in Melbroune, Florida, that took place on October 29, 2011 also had a 5 million dollar property damage. The sustained **_Draught_**  weather condition caused 990 thousand dollars in the state of Montana recorded on May 1, 2004. 
+
+While there isn't full proof way to stop mother nature, patterns observed from this analysis can be used to prepare and align rescues to help minimize the damage. For example,  **_April-May-June-July_** are the months when sever weather events tend to occur the most. Thus, planning events or planting crops in the states should factor the pattern and plan accordingly. 
+
+
+_Note: The database from NOAA contains variables that were not explored on this analysis, adding those variables to the analysis could result in additional insight that will help municipalities save lives and plan their budget._ 
+
+
